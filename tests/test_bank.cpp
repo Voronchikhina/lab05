@@ -1,19 +1,56 @@
-#include <print.hpp>
-#include <iostream>
-#include <gtest/gtest.h>
+#include <Transaction.h>
+  #include <Account.h>
+  #include <gtest/gtest.h>
+  #include <gmock/gmock.h>
 
-TEST(Print, InFileStream)
-{
-  std::string filepath = "file.txt";
-  std::string text = "hello";
-  std::ofstream out{filepath};
+  using::testing::Return;
+  using::testing::AtLeast;
+  using::testing::NiceMock;
 
-  print(text, out);
-  out.close();
+  class MockAccount: public Account{
+  public:
+   MockAccount(int id, int balance):Account(id, balance){}
+   MOCK_METHOD(int, GetBalance, (), (const, override));
+   MOCK_METHOD(void, ChangeBalance, (int diff), (override));
+   MOCK_METHOD(void, Lock, (), (override));
+   MOCK_METHOD(void, Unlock, (), (override));
+  };
 
-  std::string result;
-  std::ifstream in{filepath};
-  in >> result;
+  class MockTransaction: public Transaction{
+  public:
+   MOCK_METHOD(void, SaveToDataBase, (Account& from, Account& to, int sum), (override));
+  };
 
-  EXPECT_EQ(result, text);
-}
+  TEST(Account, GetBalance){
+   NiceMock<MockAccount> acc(1,100);
+   EXPECT_EQ(acc.Account::GetBalance(), 100);
+  }
+
+  TEST(Account, ChangeBalance){
+   NiceMock<MockAccount> acc(0, 100);
+   EXPECT_THROW(acc.Account::ChangeBalance(50), std::runtime_error);
+   acc.Account::Lock();
+   acc.Account::ChangeBalance(50);
+   EXPECT_EQ(acc.Account::GetBalance(), 150);
+
+  }
+
+  TEST(Account, Lock){
+   NiceMock<MockAccount> acc(0, 100);
+   acc.Account::Lock();
+   EXPECT_THROW(acc.Account::Lock(), std::runtime_error);
+  }
+
+  TEST(Account, Unlock){
+   NiceMock<MockAccount> acc(0, 100);
+   EXPECT_CALL(acc, Unlock()).Times(1);
+   acc.Unlock();
+  }
+
+  TEST(Transaction, SaveToDataBase){
+   NiceMock<MockAccount> f_acc(0, 200);
+   NiceMock<MockAccount> t_acc(1, 300);
+   MockTransaction tr;
+   // EXPECT_CALL(tr, SaveToDataBase(f_acc, t_acc, 150)).Times(1);
+   tr.SaveToDataBase(f_acc, t_acc, 150);
+  }
